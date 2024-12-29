@@ -1,46 +1,51 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Header from "./Components/Header";
-import FileMenuDropDown from "./Components/FileMenu";
+import FileMenuDropDown from "./Components/FileContainer/FileMenu.jsx";
 import './index.css';
+import ChatContainer from "./Components/ChatContainer/ChatContainer.jsx";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Button } from "./Components/ui/button.jsx";
 
 function App() {
-	const [count, setCount] = useState(0);
-  const [chatHistory, setChatHistory] = useState([]);
-  const [inputMessage, setInputMessage] = useState("");
+  const [showPolicy, setShowPolicy] = useState(true);
 
-  const handleSendChat = (e) => {
-    if (e.key === "Enter" && inputMessage.trim() != "") {
-      setChatHistory((prevHistory) => [...prevHistory, inputMessage])
-    }
-  }
+  // useEffect(() => {
+  //     const handleBeforeUnload = (event) => {
+  //         event.preventDefault();
+  //         event.returnValue = "";
+  //     };
+
+  //     window.addEventListener("beforeunload", handleBeforeUnload);
+
+  //     return () => {
+  //         window.removeEventListener("beforeunload", handleBeforeUnload);
+  //     };
+  // }, []);
 
 	return (
     <div className="min-h-screen w-full bg-midnight flex flex-col justify-between items-center">
-      <Header />
-      {/* <FileMenuDropDown /> */}
-      <div className="bg-[#A2BCE0] w-full sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-6xl h-[80vh] flex-grow flex flex-col justify-start rounded-lg shadow-2xl border border-cyan-200 px-2 mt-14">
-        <div>
-          <h1 className="text-black text-2xl font-bold flex justify-center">Hey there, start a conversation</h1>
-        </div>
-
-        <div className="flex-grow flex flex-col items-center justify-end overflow-y-auto">
-          {chatHistory.length == 0 ? (
-            <h4 className="text-center font-medium text-2xl">No previous chat history</h4>
-          ) : (
-            <div className="max-w-full px-4 py-2">
-              {chatHistory.map((message, index) => (
-                <p key={index} className="text-white my-10 py-8 px-2 bg-blue-800 rounded-xl">{message}</p>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <input 
-          onChange={(e) => setInputMessage(e.target.value)} onKeyDown={handleSendChat}
-          className="relative max-w-full px-10 py-2 rounded-lg bg-white text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 mt-auto mb-4 placeholder-style"
-          placeholder="Start chatting..."
-          value={inputMessage}
-        />
+      <div className="flex flex-col lg:flex-row w-full items-center space-x-10 pr-8">
+        <FileMenuDropDown />
+        <Dialog open={showPolicy}>
+        <DialogContent hideClose>
+          <DialogHeader>
+            <DialogTitle>Session will not be saved</DialogTitle>
+            <DialogDescription>
+              Whatever changes you make will not be persisted and your uploaded files(if any) will be removed at the end of the session. Saved states will be added in the future.
+            </DialogDescription>
+            <Button className="bg-black" onClick={() => setShowPolicy(false)}>I understand</Button>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+        <ChatContainer />
       </div>
     </div>
   );

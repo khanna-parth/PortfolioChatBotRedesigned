@@ -28,3 +28,6 @@ dist-ssr
 .env
 chatbot_venv
 *.pdf
+server_design.txt
+uploaded
+storage
