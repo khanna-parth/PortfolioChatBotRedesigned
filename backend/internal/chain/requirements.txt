@@ -1,0 +1,9 @@
+langchain
+langchain_community
+python-dotenv
+sentence-transformers
+torch>=1.11.0
+langchain-openai
+pypdf
+fitz
+chromadb

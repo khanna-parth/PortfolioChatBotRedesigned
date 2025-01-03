@@ -1,0 +1,22 @@
+version: "3.7"
+
+services:
+  react-app:
+    build: .  # Build from the current directory (where the Dockerfile is located)
+    container_name: react-app
+    labels:
+      - "traefik.enable=true"  # Enable Traefik for this container
+      - "traefik.http.routers.react-app.rule=Host(`chatbot.parthkhanna.me`)"  # Define the routing rule for the domain
+      - "traefik.http.services.react-app.loadbalancer.server.port=5551"  # Match the internal port exposed by the container
+      - "traefik.http.routers.react-app.entrypoints=websecure" # Use HTTPS (websecure entry point)
+      - "traefik.http.routers.react-app.tls.certresolver=letsencrypt" # Use Let's Encrypt for SSL
+    networks:
+      - web
+    expose:
+      - "5551"  # Expose port 5551 within the container for Traefik to route to
+    ports:
+      - "5551:5551"  # Map port 5551 of the container to port 4125 on the host
+
+networks:
+  web:
+    external: true

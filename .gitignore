@@ -26,8 +26,12 @@ dist-ssr
 
 # Backend resources
 .env
+**/*.env
+*.env
 chatbot_venv
 *.pdf
 server_design.txt
 uploaded
 storage
+Traefik
+Traefik/

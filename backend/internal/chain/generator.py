@@ -1,138 +1,176 @@
-from decouple import config
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_community.document_loaders import PyPDFLoader 
 import os
-import argparse
+import json
 from dotenv import load_dotenv
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import CharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
+from langchain.chains.question_answering import load_qa_chain
+from langchain_openai import ChatOpenAI
+from langchain_community.vectorstores import Chroma
+from dotenv import load_dotenv
+from concurrent.futures import ProcessPoolExecutor
+import time
+from sentence_transformers import SentenceTransformer
+from langchain.embeddings.base import Embeddings
+from typing import List
+import concurrent.futures
+import multiprocessing
+import argparse
+import warnings
+from langchain.schema import HumanMessage
 
-load_dotenv()
+'''
+Serves as refined command line standalone version of generator
+'''
 
-llm = ChatOpenAI(model="gpt-3.5-turbo")
 
-class BadPDF(Exception):
-    pass
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-contextualize_system_prompt = """Given a chat history and the latest user question \
-which might reference context in the chat history, formulate a standalone question \
-which can be understood without the chat history. Do NOT answer the question, \
-just reformulate it if needed and otherwise return it as is."""
-contextualize_prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", contextualize_system_prompt),
-        ("human", "{input}"),
-    ]
-)
+# class CustomEmbeddings(Embeddings):
+#     def __init__(self, model_name: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"):
+#         self.model = SentenceTransformer(model_name)
 
-system_prompt = (
-    "You are an assistant for question-answering tasks. "
-    "Use the following pieces of retrieved context to answer "
-    "the question. If you don't know the answer, say that you "
-    "don't know. Use three sentences maximum and keep the "
-    "answer concise."
-    "\n\n"
-    "{context}"
-)
+#     def embed_documents(self, documents: List[str]) -> List[List[float]]:
+#         return [self.model.encode(d).tolist() for d in documents]
 
-prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", system_prompt),
-        ("human", "{input}"),
-    ]
-)
+#     def embed_query(self, query: str) -> List[float]:
+#         return self.model.encode([query])[0].tolist()
 
-question_answer_chain = create_stuff_documents_chain(llm, prompt)
+def process_pdf(pdf_path):
+    loader = PyPDFLoader(pdf_path)
+    return loader.load()
 
-class UserDocumentStore:
-    def __init__(self, user_id):
-        self.user_id = user_id
-        self.vector_store = None
-        self.retriever = None
-        self.rag_chain = None
-        self.embeddings = OpenAIEmbeddings()
-        self.storage_dir = f"storage/{user_id}"
-        self.docs_stored = set()
-
-        # Ensure the storage directory exists
-        if not os.path.exists(self.storage_dir):
-            os.makedirs(self.storage_dir)
-
-        print(f"Checking for vector store in: {self.storage_dir}")
-        self.load_vector_store()
+def load_chunk_persist_pdf() -> Chroma:
+    pdf_folder_path = os.getcwd()
+    pdf_files = [os.path.join(pdf_folder_path, file) for file in os.listdir(pdf_folder_path) if file.endswith('.pdf')]
     
-    def update_refs(self):
-        docs = []
-        if not self.vector_store:
-            return
-        for x in range(len(self.vector_store.get()["ids"])):
-                doc = self.vector_store.get()["metadatas"][x]
-                source = doc["source"]
-                docs.append(source)
-        self.docs_stored = set(docs)
-
-    def load_vector_store(self):
-        vector_store_path = f"{self.storage_dir}/chroma.sqlite3"
-        
-        if os.path.exists(vector_store_path):
-            print(f"Loading existing vector store for user {self.user_id} from {vector_store_path}")
-            self.vector_store = Chroma(persist_directory=self.storage_dir, embedding_function=self.embeddings)
-
-            self.retriever = self.vector_store.as_retriever()
-            self.rag_chain = create_retrieval_chain(self.retriever, question_answer_chain)
-        else:
-            print(f"No existing vector store for user {self.user_id} at {vector_store_path}, starting fresh.")
-        self.update_refs()
-
-    def add_file(self, file_path):
-        print(f"Processing file for user {self.user_id}:", file_path)
-        loader = PyPDFLoader(file_path)
-        docs = loader.load()
-
-        if not docs or all(len(doc.page_content.strip()) == 0 for doc in docs):
-            raise BadPDF("PDF parsed content is empty")
-
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        chunks = text_splitter.split_documents(docs)
-
-        if not chunks or all(len(chunk.page_content.strip()) == 0 for chunk in chunks):
-            raise BadPDF("PDF chunked content is empty")
-
-        # Create or update vector store with documents for this user
-        if self.vector_store is None:
-            print(f"Creating new vector store for user {self.user_id}")
-            self.vector_store = Chroma.from_documents(chunks, self.embeddings, persist_directory=self.storage_dir)
-        else:
-            print(f"Adding documents to existing vector store for user {self.user_id}")
-            self.vector_store.add_documents(chunks)
-
-        self.retriever = self.vector_store.as_retriever()
-        self.rag_chain = create_retrieval_chain(self.retriever, question_answer_chain)
-        self.update_refs()
-
-    def remove_documents(self, document_ids):
-        print(f"Removing documents for user {self.user_id}: {document_ids}")
-        print(dir(self.vector_store))
-        self.vector_store.delete_document(document_ids)
-        self.retriever = self.vector_store.as_retriever()
-        self.rag_chain = create_retrieval_chain(self.retriever, question_answer_chain)
-        self.update_refs()
-
-    def get_rag_chain(self):
-        self.update_refs()
-        return self.rag_chain
+    documents = []
+    # with ProcessPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        results = executor.map(process_pdf, pdf_files)
+        for result in results:
+            documents.extend(result)
     
-    def list_docs(self):
-        return self.docs_stored
+    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=10)
+    chunked_documents = text_splitter.split_documents(documents)
+    
+    persist_directory = os.path.join(os.getcwd(), 'vector_store')
+    embedding_model = OpenAIEmbeddings()
+    
+    if os.path.exists(persist_directory):
+        # print("Loading existing vector store...")
+        vectordb = Chroma(persist_directory=persist_directory, embedding_function=embedding_model)
+    else:
+        # print("Creating a new vector store...")
+        vectordb = Chroma.from_documents(
+            documents=chunked_documents,
+            embedding=embedding_model,
+            persist_directory=persist_directory
+        )
+        vectordb.persist()
+    
+    return vectordb
 
-def answer_question(user_store: UserDocumentStore, question):
-    rag_chain = user_store.get_rag_chain()
-    if not rag_chain:
-        return "[No documents added]"
-    response = rag_chain.invoke({"input": question})
-    print(f"User has stored docs: {user_store.docs_stored}")
-    print("Answer:", response["answer"])
-    return response['answer']
+def add_documents_to_vector_store(new_documents, persist_directory):
+    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=10)
+    chunked_documents = text_splitter.split_documents(new_documents)
+    
+    vectordb = Chroma(persist_directory=persist_directory, embedding_function=CustomEmbeddings())
+    
+    vectordb.add_documents(chunked_documents)
+    
+    vectordb.persist()
+    print(f"Added {len(chunked_documents)} new documents.")
+    
+    return vectordb
+
+def remove_documents_from_vector_store(documents_to_remove, persist_directory):
+    vectordb = Chroma(persist_directory=persist_directory, embedding_function=CustomEmbeddings())
+    
+    existing_documents = vectordb.get_documents()
+    
+    updated_documents = [doc for doc in existing_documents if doc not in documents_to_remove]
+    
+    vectordb = Chroma.from_documents(
+        documents=updated_documents,
+        embedding=CustomEmbeddings(),
+        persist_directory=persist_directory
+    )
+    
+    vectordb.persist()
+    print(f"Removed {len(documents_to_remove)} documents.")
+    
+    return vectordb
+
+def create_agent_chain():
+    model_name = "gpt-3.5-turbo"
+    llm = ChatOpenAI(model_name=model_name)
+    chain = load_qa_chain(llm, chain_type="stuff", verbose=False)
+    return chain
+
+
+def get_llm_response(query):
+    vectordb = load_chunk_persist_pdf()
+
+    chain = create_agent_chain()
+    matching_docs = vectordb.similarity_search(query)
+    answer = chain.run(input_documents=matching_docs, question=query)
+    return answer
+
+# while True:
+#     prompt = input("Enter prompt: ")
+#     start = time.perf_counter()
+#     print(get_llm_response(prompt))
+#     print(f"Took {time.perf_counter() - start}s")
+
+def worker_function(query):
+    response = get_llm_response(query)
+    return response
+
+def simple_prompt(query):
+    chat = ChatOpenAI(model="gpt-3.5-turbo")
+    response = chat.invoke(query)
+    return response.content
+
+# def simulate_multiple_users(prompts):
+#     with multiprocessing.Pool(processes=multiprocessing.cpu_count()/2) as pool:
+#         responses = pool.map(worker_function, prompts)
+
+#     for prompt, response in zip(prompts, responses):
+#         print(f"Prompt: {prompt}")
+#         print(f"Response: {response}\n")
+
+# if __name__ == '__main__':
+    # prompts = [
+    #     "How is percy's relationship with his dad?",
+    #     "How is percy's relationship with his Gabe?",
+    #     "How did Percy escape the Underworld from Hades",
+    #     "How was Aphrodite described when compared to her relationship with Hades",
+    #     "How is Grover's appearance described?"
+    # ]
+
+    # simulate_multiple_users(prompts)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--dir', type=str, required=True)
+parser.add_argument('--query', type=str, required=True)
+parser.add_argument("--key", type=str, required=True)
+args = parser.parse_args()
+
+os.environ["OPENAI_API_KEY"] = args.key
+
+os.chdir(args.dir)
+
+start = time.perf_counter()
+
+if len(os.listdir()) <= 1:
+    resp = simple_prompt(args.query)
+else:
+    resp = worker_function(args.query)
+
+data = {
+    "prompt": args.query,
+    "response": resp,
+    "elapsed": time.perf_counter() - start,
+}
+print(json.dumps(data))
