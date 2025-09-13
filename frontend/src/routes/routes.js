@@ -1,5 +1,10 @@
-export const HOST = 'http://localhost:3000';
-export const RAW_HOST = 'localhost:3000'
+import { AppConfig } from "@/config/env";
+
+export const HOST = `http://${AppConfig.backendUrl}`;
+export const RAW_HOST = `${AppConfig.backendUrl}`
+
+// export const HOST = 'http://localhost:3000';
+// export const RAW_HOST = 'localhost:3000'
 // export const HOST = 'http://169.254.86.5:3000';
 // export const RAW_HOST = '169.254.86.5:3000';
 // export const RAW_HOST = "api.chatbot.parthkhanna.me"

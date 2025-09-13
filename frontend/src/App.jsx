@@ -15,6 +15,7 @@ import { Button } from "./components/ui/button.jsx";
 import { useWebSocketStore, useStore } from './store/store.js';
 import { SUGGESTIONS_ROUTE, WEBSOCKET_ROUTE } from "./routes/routes.js";
 import { apiClient } from "./lib/client.js";
+import { AppConfig } from "./config/env.js";
 
 function App() {
   const [showPolicy, setShowPolicy] = useState(true);
@@ -22,6 +23,10 @@ function App() {
   const { showSuggestions, setShowSuggestions } = useStore();
   const [suggestionsReady, setSuggestionsReady] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
+
+  useEffect(() => {
+    console.log(`BACKEND HOST URL: ${AppConfig.backendUrl}`)
+  }, [])
 
   const getSuggestions = async () => {
     try {
