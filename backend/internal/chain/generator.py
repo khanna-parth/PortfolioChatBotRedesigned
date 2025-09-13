@@ -9,12 +9,11 @@ from langchain_openai import ChatOpenAI
 from langchain_community.vectorstores import Chroma
 from dotenv import load_dotenv
 from concurrent.futures import ProcessPoolExecutor
-import time
 from sentence_transformers import SentenceTransformer
+import time
 from langchain.embeddings.base import Embeddings
 from typing import List
 import concurrent.futures
-import multiprocessing
 import argparse
 import warnings
 from langchain.schema import HumanMessage
@@ -26,15 +25,15 @@ Serves as refined command line standalone version of generator
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-# class CustomEmbeddings(Embeddings):
-#     def __init__(self, model_name: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"):
-#         self.model = SentenceTransformer(model_name)
+class CustomEmbeddings(Embeddings):
+    def __init__(self, model_name: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"):
+        self.model = SentenceTransformer(model_name)
 
-#     def embed_documents(self, documents: List[str]) -> List[List[float]]:
-#         return [self.model.encode(d).tolist() for d in documents]
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return [self.model.encode(text).tolist() for text in texts]
 
-#     def embed_query(self, query: str) -> List[float]:
-#         return self.model.encode([query])[0].tolist()
+    def embed_query(self, text: str) -> List[float]:
+        return self.model.encode([text])[0].tolist()
 
 def process_pdf(pdf_path):
     loader = PyPDFLoader(pdf_path)
@@ -104,7 +103,7 @@ def remove_documents_from_vector_store(documents_to_remove, persist_directory):
 
 def create_agent_chain():
     model_name = "gpt-3.5-turbo"
-    llm = ChatOpenAI(model_name=model_name)
+    llm = ChatOpenAI(name=model_name)
     chain = load_qa_chain(llm, chain_type="stuff", verbose=False)
     return chain
 

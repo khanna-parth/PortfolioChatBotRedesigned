@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import Header from "./Components/Header";
-import FileMenuDropDown from "./Components/FileContainer/FileMenu.jsx";
+import Header from "./components/Header";
+import FileMenuDropDown from "./components/FileContainer/FileMenu.jsx";
 import './index.css';
-import ChatContainer from "./Components/ChatContainer/ChatContainer.jsx";
+import ChatContainer from "./components/ChatContainer/ChatContainer.jsx";
 import {
   Dialog,
   DialogContent,
@@ -10,15 +10,38 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/Components/ui/dialog"
-import { Button } from "./Components/ui/button.jsx";
-import { useWebSocketStore } from './store/store.js';
-import { WEBSOCKET_ROUTE } from "./routes/routes.js";
-
+} from "@/components/ui/dialog"
+import { Button } from "./components/ui/button.jsx";
+import { useWebSocketStore, useStore } from './store/store.js';
+import { SUGGESTIONS_ROUTE, WEBSOCKET_ROUTE } from "./routes/routes.js";
+import { apiClient } from "./lib/client.js";
 
 function App() {
   const [showPolicy, setShowPolicy] = useState(true);
   const { ws, connection, connID, setWebSocket, setConnected, setConnID } = useWebSocketStore();
+  const { showSuggestions, setShowSuggestions } = useStore();
+  const [suggestionsReady, setSuggestionsReady] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+
+  const getSuggestions = async () => {
+    try {
+      const response = await apiClient.get(SUGGESTIONS_ROUTE)
+      console.log(response);
+      setSuggestions(response.data.suggestions);
+      setTimeout(3000);
+      setSuggestionsReady(true);
+      console.log(`Set suggestions to ${response.data.suggestions}`)
+    } catch (error) {
+      setSuggestions(["Something went wrong with getting you suggestions."]);
+      setSuggestionsReady(true);
+      console.log(`Suggestions error: ${error}`)
+    }
+  }
+
+  useEffect(() => {
+    if (!showSuggestions) return;
+    getSuggestions();
+  }, [showSuggestions])
 
   useEffect(() => {
     setConnected(null);
@@ -82,6 +105,30 @@ function App() {
                 </DialogDescription>
                 <Button className="bg-black" onClick={() => setShowPolicy(false)}>I understand</Button>
               </DialogHeader>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={suggestionsReady}>
+            <DialogContent hideClose>
+              <DialogHeader>
+                <DialogTitle>What you may be curious about...</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col">
+                <ul>
+                  {
+                    suggestions.length > 0 && (
+                      suggestions.map((suggestion, index) => {
+                        <li key={index}>{suggestion}21212121</li>
+                      })
+                    )
+                  }
+                  {
+                    suggestions.length < 0 && (
+                      <div>No content</div>
+                    )
+                  }
+                </ul>
+              </div>
+              <Button className="bg-black" onClick={() => setSuggestionsReady(false)}>Got it</Button>
             </DialogContent>
           </Dialog>
         </div>

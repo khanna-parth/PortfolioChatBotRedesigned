@@ -1,51 +1,40 @@
-# Dockerfile for compiling backend (go server, python internals)
-
-
 FROM python:3.11-slim as python-builder
 
-RUN apt-get update && apt-get install -y python3 python3-pip
+WORKDIR /app/python
 
-WORKDIR /project/backend/internal/chain
+COPY backend/internal/chain/requirements.txt .
 
-COPY backend/internal/chain/requirements.txt /project/backend/internal/chain/requirements.txt
-COPY backend/internal/chain/generator.py /project/backend/internal/chain/generator.py
+RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
 
-RUN pip3 install --no-cache-dir -r /project/backend/internal/chain/requirements.txt
-
+COPY backend/internal/chain/ .
 
 FROM golang:1.23-alpine as go-builder
 
 RUN apk add --no-cache libc6-compat
-WORKDIR /project/backend/server
-COPY backend/server/ /project/backend/server
-RUN go build -o server .
 
+WORKDIR /app/go
+
+COPY backend/server/ .
+RUN go build -o server .
 
 FROM python:3.11-slim
 
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y python3-pip && \
-    ln -sf /usr/bin/python3 /usr/bin/python
+WORKDIR /project
 
-RUN which python3 || echo "python3 not found" && \
-    which python || echo "python not found" && \
-    python3 --version || echo "python3 execution failed" && \
-    python --version || echo "python execution failed"
+COPY --from=python-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=python-builder /usr/local/bin /usr/local/bin
 
-COPY --from=python-builder /project/backend/internal/chain/requirements.txt /project/backend/internal/chain/requirements.txt
-RUN pip3 install --no-cache-dir -r /project/backend/internal/chain/requirements.txt
+COPY --from=python-builder /app/python /project/backend/internal/chain
 
-COPY --from=python-builder /project/backend/ /project/backend/
+COPY --from=go-builder /app/go/server /project/backend/server/server
 
 COPY backend/server/prod.env /project/backend/server/prod.env
 
-COPY --from=go-builder /project/backend/server/server /project/backend/server/server
-
-RUN mkdir -p /project/backend/uploaded
+RUN mkdir -p /project/backend/uploaded/STATIC/@Parth
 
 WORKDIR /project/backend/server
 
 EXPOSE 8080
 
 CMD ["./server"]
+

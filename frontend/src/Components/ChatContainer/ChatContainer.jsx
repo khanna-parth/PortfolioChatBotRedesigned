@@ -1,19 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner';
 import { IoSend } from "react-icons/io5";
-import { Avatar, AvatarFallback, AvatarImage } from "@/Components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { apiClient } from '../../lib/client.js';
 import { PRESET_PROMPT_ROUTE, PROMPT_ROUTE } from '../../routes/routes.js';
 import { FaCircle } from "react-icons/fa";
 import docbotImage from '../../assets/docubot.png'
 import { useStore, useWebSocketStore } from '../../store/store.js';
 import { dotWave, quantum } from 'ldrs';
+import { isIDPreset } from '../../lib/utils.js';
 
 const ChatContainer = () => {
     const [inputMessage, setInputMessage] = useState("");
     const [sendPressed, setSendPressed] = useState(false);
     const [isActive, setIsActive] = useState(null);
     const { chatHistory, setChatHistory } = useStore();
+    const { showSuggestions, setShowSuggestions } = useStore();
     const { ws, connected, connID } = useWebSocketStore();
     const [generating, setGenerating] = useState(false);
     const chatContainerRef = useRef(null);
@@ -36,6 +38,11 @@ const ChatContainer = () => {
             setInputMessage("");
             setSendPressed(false);
         }
+    }
+
+    const toggleSuggestions = () => {
+        // console.log("Toggling suggestiosn");
+        setShowSuggestions(!showSuggestions);
     }
 
     const sendPrompt = async (prompt) => {
@@ -131,6 +138,14 @@ const ChatContainer = () => {
                             chatHistory.length == 0 ? (
                                 <div className='flex flex-col items-center justify-center h-full'>
                                     <h4 className="text-center items-center justify-center font-medium text-2xl text-white text-opacity-60">Start a conversation below</h4>
+                                    {
+                                        isIDPreset(connID) && (
+                                            <div className='flex flex-col mt-5 space-y-1 w-full items-center justify-center'>
+                                                <h1 className='flex mt-5 text-white text-sm'>Don't know what to ask?</h1>
+                                                <h1 className='flex mt-5 text-yellow-300 text-xs cursor-pointer' onClick={toggleSuggestions}>See Suggestions</h1>
+                                            </div>
+                                        )
+                                    }
                                 </div>
                             ) : (
                             <div className="flex flex-col space-y-4">

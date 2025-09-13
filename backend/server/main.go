@@ -21,7 +21,7 @@ func main() {
 	godotenv.Load()
 	// var config map[string]string
 
-	readCfg, err := godotenv.Read("dev.env")
+	readCfg, err := godotenv.Read("prod.env")
 	if err != nil {
 		log.Fatalf(".ENV file invalid/missing: %v\n", err.Error())
 	}
@@ -92,6 +92,9 @@ func listen(connections *link.ConnectionStore) {
 	})
 	
 	mux.HandleFunc("/heartbeat", handlers.HeartbeatHandler)
+	mux.HandleFunc("/demo/suggestions", func(w http.ResponseWriter, r *http.Request) {
+		handlers.SuggestionHandler(w, r, connections.Config)
+	})
 
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		handlers.HandleWebSocket(w, r, connections)

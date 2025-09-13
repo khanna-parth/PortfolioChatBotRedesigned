@@ -15,6 +15,8 @@ export const useStore = create((set, get) => ({
     resetChatHistory: () => {
       set({ chatHistory: [] });
     },
+    showSuggestions: false,
+    setShowSuggestions: (state) => set({ showSuggestions: state }),
   }));
 
 export const useWebSocketStore = create((set) => ({

@@ -8,8 +8,12 @@ import { PRESETS_ROUTE, UPLOAD_DOC_ROUTE } from '../../routes/routes.js';
 import { useStore, useWebSocketStore } from '../../store/store.js';
 import { hourglass } from 'ldrs';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Button } from "@/Components/ui/button"
+import { Button } from "@/components/ui/button"
 import { apiClient } from '../../lib/client.js';
+import { isIOSSafari } from '../../lib/utils.js';
+import { isIDPreset } from '../../lib/utils.js';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { FaInfoCircle } from "react-icons/fa";
 
 
 export default function FileMenu() {
@@ -47,6 +51,10 @@ export default function FileMenu() {
       if (selection == selectedPreset) return;
       resetChatHistory();
       if (selection == "Custom") {
+        if (isIOSSafari()) {
+          window.location.reload();
+          return;
+        }
         setWebSocket(null);
         setSelectedPreset("Custom")
       } else {
@@ -56,12 +64,7 @@ export default function FileMenu() {
       }
     }
 
-    const isIDPreset = (id) => {
-      if (id.startsWith("@")) {
-        return true;
-      }
-      return false;
-    }
+    
 
     useEffect(() => {
       if (connected) {
@@ -144,9 +147,23 @@ export default function FileMenu() {
                         <>
                           {
                             isIDPreset(connID) && (
-                              <div className='w-full flex flex-col justify-center items-center space-y-4 p-3'>
-                                <BiSolidErrorAlt size={60} color='white'/>
-                                <h4 className='w-full text-lg flex text-white'>Presets Active</h4>
+                              <div>
+                                <div className='w-full flex flex-col justify-center items-center space-y-4 p-3'>
+                                  <BiSolidErrorAlt size={60} color='white'/>
+                                  <div className='flex flex-row space-x-2 items-center justify-center'>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger><FaInfoCircle color='gray' /></TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Cannot modify someone else's collection</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                    <h4 className='w-full text-lg flex text-white'>Presets Active</h4>
+                                    
+                                  </div>
+                                  
+                                </div>
                               </div>
                             )
                           }
