@@ -1,6 +1,6 @@
 import { AppConfig } from "@/config/env";
 
-export const HOST = `http://${AppConfig.backendUrl}`;
+export const HOST = `https://${AppConfig.backendUrl}`;
 export const RAW_HOST = `${AppConfig.backendUrl}`
 
 // export const HOST = 'http://localhost:3000';
